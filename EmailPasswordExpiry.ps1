@@ -25,11 +25,11 @@ $ErrorActionPreference = "Stop"
 <br />
 <b>Password Policy:</b>
 <ul>
-<li>Must be at least 8 characters, though a minimum of 12 characters is recommended</li>
-<li>You should avoid using a previous password</li>
-<li>Passwords expire and must be changed every 6 months</li>
-<li>A good password should include capital letters, lower-case letters, numbers, and symbols</li>
-<li>Ensure your password is kept safe and confidential, if you need to write it down ensure it is kept in a secure location</li>
+<li></li>
+<li></li>
+<li></li>
+<li></li>
+<li></li>
 </ul>
 <br />
 <br />
