@@ -129,3 +129,5 @@ function AddExchangeUser($Username)
 
     Remove-PSSession $Session
 }
+
+Export-ModuleMember *-*

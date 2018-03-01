@@ -81,3 +81,5 @@ function DoExchangeStuff($Username, $EmailAccess)
 
     Remove-PSSession $Session
 }
+
+Export-ModuleMember *-*
