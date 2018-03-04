@@ -47,7 +47,7 @@ function New-Employee
         $UPN = $Username + (&{If($UPNMap -Contains $Company) {$UPNMap.$Company} Else { "@$($Domain)"}});
 
         $result = New-ADUser -Server $Domain -Name $DisplayName -SAMAccountName $Username -DisplayName $DisplayName -GivenName $FirstName -Surname $LastName `
-            -Company $Company -Department $Department `
+            -Company $Company -Department $Department -Description $Department -Office $Department `
             -AccountPassword $Password -ChangePasswordAtLogon $true `
             -HomeDrive $HomeDrive -HomeDirectory $DrivePath `
             -Enabled $true -UserPrincipalName $UPN -Passthru
@@ -126,6 +126,8 @@ function AddExchangeUser($Username)
     Import-PSSession $Session
 
     $null = Enable-Mailbox -Identity $Username -Alias $Username # Setting to $null limits the spammy output
+    
+    Update-OfflineAddressBook "\Default Offline Address Book"
 
     Remove-PSSession $Session
 }

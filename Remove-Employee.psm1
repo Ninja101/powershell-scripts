@@ -17,7 +17,7 @@ function Remove-Employee
     )
     PROCESS {
 
-        $User = Get-ADUser -Identity $Username -Server $Domain
+        $User = Get-ADUser -Identity $Username -Server $Domain -Properties Company,memberof
 
         if ($User -eq $null)
         {
@@ -36,20 +36,25 @@ function Remove-Employee
 
         ###
 
+        $User | Set-ADUser -Company ($User.Company + "-NLE")
+        Write-Host "User will be removed from dynamic address lists"
+
+        ###
+
         $GroupList = @()
-        $Groups = Get-ADUser -Identity $Username -Server $Domain -Properties * | select -ExpandProperty memberof
+        $Groups = $User | select -ExpandProperty memberof
         foreach($i in $Groups)
         {
             $i = ($i -split ',')[0]
             $GroupList += ($i -creplace 'CN=|}', '')
         }
 
-        (Get-ADUser -Identity $Username -Server $Domain -properties memberof).memberof | Remove-ADGroupMember -Server $Domain -member $Username -Confirm:$false
+        $User.memberof | Remove-ADGroupMember -Server $Domain -member $Username -Confirm:$false
         Write-Host "Removed user to the following groups: " (($GroupList | Sort-Object) -Join ", ")
 
         ###
 
-        Get-ADUser -Identity $Username -Server $Domain | Move-ADObject -Server $Domain -TargetPath $NewOUPath
+        $User | Move-ADObject -Server $Domain -TargetPath $NewOUPath
         Write-Host "User account moved to NLE OU"
 
         ### Exchange
@@ -78,6 +83,8 @@ function DoExchangeStuff($Username, $EmailAccess)
         Add-MailboxPermission -Identity $Username -User $EmailAccess -AccessRights FullAccess -InheritanceType All -AutoMapping:$true
         Write-Host "User mailbox permissions added for $EmailAccess"
     }
+
+    Update-OfflineAddressBook "\Default Offline Address Book"
 
     Remove-PSSession $Session
 }
