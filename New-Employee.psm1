@@ -1,8 +1,16 @@
-[string]$Departments = @("accounts", "purchasing", "returns", "sales")
-[string]$DrivePathPrefix = "" # End with a backslash
 [string]$ExchangeConnectionURL = "http://exchange.corp.domain.com/PowerShell/"
+[string]$OfflineAddressBook = "\Default Offline Address Book"
+
+[string]$DrivePathPrefix = "\\fileserver.corp.domain.com\Users$\" # End with a backslash
 [string]$HomeDrive = "U:"
-[string]$UPNMap = @{ "Company"="@corp.domain.com" } # Separated by semi-colon
+
+$UPNMap = @{ "Company"="@corp.domain.com" } # Separated by semi-colon
+$OUMap = @{ "Company"="OU=Users,OU=Company,DC=corp,DC=domain,DC=com" } # Separated by semi-colon
+$GroupMap = @{ "Company"=@("Company Staff", "CompanyAll") } # Separated by semi-colon, use shown format to have multiple groups per company
+$DepartmentGroupMap = @{ "accounts"="Accounts Staff"; "purchasing"="Purchasing Staff"; "returns"="Returns Staff"; "sales"="Sales Staff" }
+
+[string]$AllStaffGroup = "All Staff"
+[string]$VPNGroup = "VPN Users"
 
 function New-Employee
 {
@@ -21,12 +29,14 @@ function New-Employee
         [string]$Department,
 
         [Parameter(Mandatory=$true)]
-        [string]$IsRemote,
+        [ValidateRange(0,1)] 
+        [int]$IsRemote,
 
         [Parameter(Mandatory=$true)]
         [string]$Domain
     )
     PROCESS {
+        $DomainDNS = (Get-ADDomain -Server $DOMAIN).DNSRoot
         $Username = ("{0}.{1}" -f $FirstName.Substring(0,1), $LastName).ToLower( );
 
         try
@@ -44,18 +54,23 @@ function New-Employee
         $PasswordRaw = [string]("abcdefghijklmnopqrstuvwxyz0123456789".ToCharArray() | Get-Random -Count 12)
         $Password = ConvertTo-SecureString -String $PasswordRaw -AsPlainText -Force
 
-        $UPN = $Username + (&{If($UPNMap -Contains $Company) {$UPNMap.$Company} Else { "@$($Domain)"}});
+        $UPN = $Username + (&{If($UPNMap.$Company) {$UPNMap.$Company} Else { "@$($DomainDNS)"}});
 
-        $result = New-ADUser -Server $Domain -Name $DisplayName -SAMAccountName $Username -DisplayName $DisplayName -GivenName $FirstName -Surname $LastName `
+        $ResultUser = New-ADUser -Server $Domain -Name $DisplayName -SAMAccountName $Username -DisplayName $DisplayName -GivenName $FirstName -Surname $LastName `
             -Company $Company -Department $Department -Description $Department -Office $Department `
             -AccountPassword $Password -ChangePasswordAtLogon $true `
             -HomeDrive $HomeDrive -HomeDirectory $DrivePath `
             -Enabled $true -UserPrincipalName $UPN -Passthru
 
-        if ($result -eq $null)
+        if ($ResultUser -eq $null)
         {
             Write-Warning "Failed to add user, aborting.";
             return;
+        }
+
+        If ($OUMap.$Company)
+        {
+            $ResultUser | Move-ADObject -TargetPath $OUMap.$Company
         }
 
         CreateDrivePath $Username $DrivePath
@@ -66,16 +81,27 @@ function New-Employee
 
         $Groups = New-Object System.Collections.Generic.List[System.Object]
 
-        $Groups.Add("All Staff");
+        $Groups.Add($AllStaffGroup);
 
-        if ($Departments -Contains $Department.ToLower())
+        If ($GroupMap.$Company)
         {
-            $Groups.Add("$Department Staff");
+            ForEach($Group in $GroupMap.$Company)
+            {
+                $Groups.Add($Group);
+            }
+        }
+
+        if ($DepartmentGroupMap.$Department)
+        {
+            ForEach ($Group in $DepartmentGroupMap.$Department)
+            {
+                $Groups.Add($Group);
+            }
         }
 
         if ($IsRemote -eq 1)
         {
-            $Groups.Add("VPN Users");
+            $Groups.Add($VPNGroup);
         }
 
         ForEach($Group in $Groups)
@@ -126,8 +152,8 @@ function AddExchangeUser($Username)
     Import-PSSession $Session
 
     $null = Enable-Mailbox -Identity $Username -Alias $Username # Setting to $null limits the spammy output
-    
-    Update-OfflineAddressBook "\Default Offline Address Book"
+
+    Update-OfflineAddressBook $OfflineAddressBook
 
     Remove-PSSession $Session
 }
