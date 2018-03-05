@@ -7,7 +7,22 @@
 $UPNMap = @{ "Company"="@corp.domain.com" } # Separated by semi-colon
 $OUMap = @{ "Company"="OU=Users,OU=Company,DC=corp,DC=domain,DC=com" } # Separated by semi-colon
 $GroupMap = @{ "Company"=@("Company Staff", "CompanyAll") } # Separated by semi-colon, use shown format to have multiple groups per company
-$DepartmentGroupMap = @{ "accounts"="Accounts Staff"; "purchasing"="Purchasing Staff"; "returns"="Returns Staff"; "sales"="Sales Staff" }
+$DepartmentGroupMap = @{
+    "Company"=@{
+        "accounts"="Accounts Staff";
+        "purchasing"="Purchasing Staff";
+        "returns"="Returns Staff";
+        "sales"="Sales Staff"
+    }
+}
+$DepartmentMailboxMap = @{
+    "Company"=@{
+        "accounts"="Accounts";
+        "purchasing"="Purchasing";
+        "returns"="Returns";
+        "sales"="Sales"
+    }
+}
 
 [string]$AllStaffGroup = "All Staff"
 [string]$VPNGroup = "VPN Users"
@@ -91,9 +106,9 @@ function New-Employee
             }
         }
 
-        if ($DepartmentGroupMap.$Department)
+        if ($DepartmentGroupMap.$Company.$Department)
         {
-            ForEach ($Group in $DepartmentGroupMap.$Department)
+            ForEach ($Group in $DepartmentGroupMap.$Company.$Department)
             {
                 $Groups.Add($Group);
             }
@@ -149,9 +164,19 @@ function AddExchangeUser($Username)
     $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $ExchangeConnectionURL `
         -Authentication Kerberos # -Credential $UserCredential
 
-    Import-PSSession $Session
+    $null = Import-PSSession $Session -DisableNameChecking
 
     $null = Enable-Mailbox -Identity $Username -Alias $Username # Setting to $null limits the spammy output
+
+    if ($DepartmentMailboxMap.$Company.$Department)
+    {
+        ForEach ($Mailbox in $DepartmentMailboxMap.$Company.$Department)
+        {
+            $null = Add-MailboxPermission -Identity $Mailbox -User $Username -AccessRights FullAccess -InheritanceType All -AutoMapping $True
+        }
+
+        Write-Host "Added user to the following exchange mailboxes: " (($DepartmentMailboxMap.$Company.$Department | Sort-Object) -Join ", ")
+    }
 
     Update-OfflineAddressBook $OfflineAddressBook
 
