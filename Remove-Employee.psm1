@@ -75,8 +75,14 @@ function DoExchangeStuff($Username, $EmailAccess)
 
     Import-PSSession $Session
 
-    Set-Mailbox -Identity $Username -Type Shared -HiddenFromAddressListsEnabled:$true
+    $Mailbox = Get-Mailbox -Identity $Username
+
+    $Mailbox | Set-Mailbox -Type Shared -HiddenFromAddressListsEnabled:$true
     Write-Host "User mailbox set to shared and removed from address lists"
+
+    $Mailbox | Set-CASMailbox -ActiveSyncEnabled $false
+    Get-MobileDevice -Mailbox $Mailbox | Remove-MobileDevice
+    Write-Host "Removed activesync if enabled, and any attached mobile devices"
 
     if ($EmailAccess.length -gt 0)
     {
